@@ -601,6 +601,14 @@ def criar_fato():
 
     df_dim_setor.createOrReplaceTempView('temp_dim_setor')
 
+    df_dim_ramo = spark.read \
+        .option('encoding', 'UTF-8') \
+        .option('delimiter', ';') \
+        .option('header', 'true') \
+        .csv(f'{utils.getPaths()[0].get("default")}/{utils.getPaths()[1].get("load")}/dim_ramo.csv')
+
+    df_dim_ramo.createOrReplaceTempView('temp_dim_ramo')
+
     df_cnae_principal = spark.sql("""
         SELECT 
             cn.cd_cnpj,
@@ -608,12 +616,15 @@ def criar_fato():
             cnp.id_cnae_principal,
             substring(cn.cod_ramo_atividade_principal, 1, 2),
             rset.ramo_de_atividade,
+            ramo.id_ramo,
             set.id_setor
         FROM temp_cnae as cn
         LEFT JOIN temp_dim_cnae_principal cnp
             ON cn.de_ramo_atividade_principal = cnp.desc_cnae_principal
         LEFT JOIN temp_setores_ramos_atividades as rset
             ON substring(cn.cod_ramo_atividade_principal, 1, 2) = rset.divisao_2_digitos_cnae
+        LEFT JOIN temp_dim_ramo as ramo
+            ON substring(cn.cod_ramo_atividade_principal, 1, 2) = ramo.digito_cnae
         LEFT JOIN temp_dim_setor as set
             ON rset.ramo_de_atividade = set.desc_setor
     """).createOrReplaceTempView('temp_setor')
@@ -641,7 +652,9 @@ def criar_fato():
             emp_calc.flag_optante_simei,
             st.id_saude_tributaria,
             na.id_nivel_atividade,
-            set.id_setor
+            set.id_setor,
+            set.id_cnae_principal,
+            set.id_ramo
         FROM temp_empresas as emp
         LEFT JOIN temp_dim_nat_juridica as nj
             ON nj.desc_natureza_juridica = emp.de_natureza_juridica
